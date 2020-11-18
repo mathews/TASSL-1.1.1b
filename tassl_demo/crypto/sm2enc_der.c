@@ -60,6 +60,7 @@
 #include <stdint.h>
 #include <string.h>
 #include "openssl/sm2.h"
+#include "obj_mac.h"
 
 EC_KEY *CalculateKey(const EC_GROUP *ec_group, const char *privkey_hex_string)
 {
@@ -142,7 +143,7 @@ int main(int argc, char *argv[])
 	size_t outlen;
 	unsigned char *out = NULL;
 	int retval;
-	SM2ENC *sm2enc = NULL;
+	int *sm2enc = NULL;
 
 	if (argc < 4)
 	{
@@ -174,7 +175,7 @@ int main(int argc, char *argv[])
 			goto err;
 		}
 
-		outlen = i2d_SM2ENC((const SM2ENC *)sm2enc, &out);
+		outlen = i2d_SM2ENC((const int *)sm2enc, &out);
 		if (!outlen)
 			goto err;
         
@@ -208,7 +209,7 @@ int main(int argc, char *argv[])
 		p = (const unsigned char *)in;
 		sm2enc = d2i_SM2ENC(NULL, (const unsigned char **)&p, inlen);
 
-		retval = sm2_decrypt(NULL, &outlen, (const SM2ENC *)sm2enc, NULL/*EVP_sm3()*/, sm2key);
+		retval = sm2_decrypt(NULL, &outlen, (const int *)sm2enc, NULL/*EVP_sm3()*/, sm2key);
 		if (!retval)
 		{
 			OPENSSL_free(in);
@@ -225,7 +226,7 @@ int main(int argc, char *argv[])
 		}
 
 		memset(out, 0, outlen + 2);
-		retval = sm2_decrypt(out, &outlen, (const SM2ENC *)sm2enc, NULL/*EVP_sm3()*/, sm2key);
+		retval = sm2_decrypt(out, &outlen, (const int *)sm2enc, NULL/*EVP_sm3()*/, sm2key);
 		OPENSSL_free(in);
 		if (!retval)
 		{
