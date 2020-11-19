@@ -59,9 +59,14 @@ Written by caichenghang for the TaSSL project.
 #include <stdlib.h>
 #include <stdint.h>
 #include <string.h>
-#include "openssl/ec.h"
-#include "openssl/evp.h"
-#include "openssl/sm2.h"
+#include <openssl/ec.h>
+#include <openssl/evp.h>
+#include <openssl/sm2.h>
+#include <openssl/bn.h>
+#include <openssl/bio.h>
+#include <openssl/err.h>
+#include <openssl/pem.h>
+#include <openssl/x509.h>
 
 #ifndef GU_NO_DEBUG
 #define DEBUG_CHAR_HEX(buf_ptr, buf_len) \
@@ -75,7 +80,11 @@ Written by caichenghang for the TaSSL project.
 #define DEBUG_CHAR_HEX(buf_ptr, buf_len)
 #endif
 
-
+/**
+ *  convert a string to base16 binary.
+ *  @return converted char number
+ */
+ 
 int b2s(char *bin, char *outs)
 {
         int i = 0;
@@ -94,6 +103,24 @@ int b2s(char *bin, char *outs)
                 memset(outs++, iRet, 1);
         }
         return i;
+}
+
+void read_whole_file(char fileName[1000], char buffer[3072])
+{
+    FILE * file = fopen(fileName, "r");
+    if(file == NULL)
+    {
+        puts("File not found");
+        exit(1);
+    }
+    char  c;
+    int idx=0;
+    while (fscanf(file , "%c" ,&c) == 1)
+    {
+        buffer[idx] = c;
+        idx++;
+    }
+    buffer[idx] = 0;
 }
 
 EC_KEY *CalculateKey(const EC_GROUP *ec_group, const char *privkey_hex_string)
@@ -152,19 +179,26 @@ EC_KEY *CalcSm2PublicKey(const char *pubkey_hex_string, char* private_hex_x)
     ec_group = EC_GROUP_new_by_curve_name(OBJ_sn2nid("SM2"));
     if (ec_group == NULL)
         goto err;
+    printf("ec_group\n");
 
-    pubkey = EC_POINT_hex2point(ec_group, (const char *)pubkey_hex_string, NULL, NULL);
+     EC_POINT *ecp =NULL;
+
+    pubkey = EC_POINT_hex2point(ec_group, (const char *)pubkey_hex_string, ecp, NULL);
     if (!pubkey)
         goto err;
+    printf("EC_POINT_hex2point\n");
 
     ec_key = EC_KEY_new();
     if (!ec_key) goto err;
+    printf("EC_KEY_new\n");
+
     if (!EC_KEY_set_group(ec_key, ec_group))
     {
         EC_KEY_free(ec_key);
         ec_key = NULL;
         goto err;
     }
+     printf("EC_KEY_set_group\n");
 
     if (!EC_KEY_set_public_key(ec_key, pubkey))
     {
@@ -172,7 +206,7 @@ EC_KEY *CalcSm2PublicKey(const char *pubkey_hex_string, char* private_hex_x)
         ec_key = NULL;
         goto err;
     }
-   
+     printf("EC_KEY_set_public_key\n");
    
     if(private_hex_x != NULL){
         bn_len = b2s((char *)private_hex_x, raw_buf);
@@ -204,6 +238,40 @@ err:
     return ec_key;
 }
 
+EVP_PKEY *ReadEvpKeyFromPem(char fileName[1000]){
+    EVP_PKEY *pkey = NULL;
+    BIO              *certbio = NULL;
+  BIO               *outbio = NULL;
+  X509                *cert = NULL;
+  int ret;
+
+     OpenSSL_add_all_algorithms();
+  ERR_load_BIO_strings();
+  ERR_load_crypto_strings();
+
+  /* ---------------------------------------------------------- *
+   * Create the Input/Output BIO's.                             *
+   * ---------------------------------------------------------- */
+  certbio = BIO_new(BIO_s_file());
+  outbio  = BIO_new_fp(stdout, BIO_NOCLOSE);
+
+  /* ---------------------------------------------------------- *
+   * Load the certificate from file (PEM).                      *
+   * ---------------------------------------------------------- */
+  ret = BIO_read_filename(certbio, fileName);
+  if (! (cert = PEM_read_bio_X509(certbio, NULL, 0, NULL))) {
+    BIO_printf(outbio, "Error loading cert into memory\n");
+    exit(-1);
+  }
+
+  /* ---------------------------------------------------------- *
+   * Extract the certificate's public key data.                 *
+   * ---------------------------------------------------------- */
+  if ((pkey = X509_get_pubkey(cert)) == NULL)
+    BIO_printf(outbio, "Error getting public key from certificate");
+
+    return pkey;
+}
 
 EC_KEY *CalculatePubKey(const EC_GROUP *ec_group, const char *pub_hex_string)
 {
@@ -265,7 +333,15 @@ int main(int argc, char *argv[])
     if (!strcasecmp(argv[1], "E"))
     {
         /*Encrypt*/
-        sm2key = CalcSm2PublicKey(argv[2], NULL);
+        // char cert_buf[3072] = {0};
+        // read_whole_file(argv[2],cert_buf);
+        // printf("certs: %s", cert_buf);
+        // char cert_buf[] = "0488401CB3995DEBAEC11B891992C7E83675359D4A2C910EFF25DA17928B263B1E8D919A63AE4EED467E57DE41EAB96ED5085850BCEF0B480C5929CB3F1F1DDFE4";
+        // sm2key = CalcSm2PublicKey(cert_buf, NULL);
+        EVP_PKEY *eKey = ReadEvpKeyFromPem(argv[2]);
+        if(eKey){
+            sm2key = EVP_PKEY_get1_EC_KEY(eKey);
+        }
         if (!sm2key)
         {
             printf("Error Of Calculate SM2 Public Key.\n");
@@ -291,7 +367,9 @@ int main(int argc, char *argv[])
         size_t inlen = strlen(argv[3]) / 2;
         
         /*Decrypt*/
-        sm2key = CalculateKey((const EC_GROUP *)sm2group, argv[2]);
+         char cert_buf[3072] = {0};
+        read_whole_file(argv[2],cert_buf);
+        sm2key = CalculateKey((const EC_GROUP *)sm2group, cert_buf);
         if (!sm2key)
         {
             printf("Error Of Calculate SM2 Private Key.\n");
