@@ -286,7 +286,7 @@ int main(int argc, char *argv[])
     	}
 
     	//hex2bin((const unsigned char *)argv[3], inlen * 2, in);
-	b2s(argv[3], in);
+		b2s(argv[3], in);
 
     	/*Set sm2 encdata format, 0 for ASN1(default), 1 for C1C3C2*/
     	/*EVP_PKEY_CTX_set_sm2_encdata_format(ctx, 1);*/

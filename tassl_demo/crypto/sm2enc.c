@@ -69,53 +69,68 @@ Written by caichenghang for the TaSSL project.
 #include <openssl/x509.h>
 
 #ifndef GU_NO_DEBUG
-#define DEBUG_CHAR_HEX(buf_ptr, buf_len) \
-		 printf("\n%s=[",#buf_ptr);\
-		for(i = 0; i<(buf_len); i++){\
-			printf("%02X", *((unsigned char *)(buf_ptr)+i));\
-		}\
-		printf("]\n");
+#define DEBUG_CHAR_HEX(buf_ptr, buf_len)                      \
+    printf("\n%s=[", #buf_ptr);                               \
+    for (i = 0; i < (buf_len); i++)                           \
+    {                                                         \
+        printf("0x%02X,", *((unsigned char *)(buf_ptr) + i)); \
+    }                                                         \
+    printf("]\n");
 
 #else
 #define DEBUG_CHAR_HEX(buf_ptr, buf_len)
+#endif
+
+#ifndef GU_NO_DEBUG
+#define DEBUG_CHAR(buf_ptr, buf_len)                      \
+    printf("\n%s=[", #buf_ptr);                               \
+    for (i = 0; i < (buf_len); i++)                           \
+    {                                                         \
+        printf("%c", *((unsigned char *)(buf_ptr) + i)); \
+    }                                                         \
+    printf("]\n");
+
+#else
+#define DEBUG_CHAR(buf_ptr, buf_len)
 #endif
 
 /**
  *  convert a string to base16 binary.
  *  @return converted char number
  */
- 
+
 int b2s(char *bin, char *outs)
 {
-        int i = 0;
-        char tmpbuf[4];
-        int iRet = 0;
-        char *ptr = bin;
-        for(i = 0; i<strlen(bin)/2; i++){
-                memset(tmpbuf, 0x00, sizeof(tmpbuf));
-                memcpy(tmpbuf, ptr, 2);
-                ptr += 2;
-                iRet = strtol(tmpbuf, NULL, 16);
-                #ifndef NO_DEBUG
-                //printf("the iRet =[%d]\n", iRet);
-                #endif
-                
-                memset(outs++, iRet, 1);
-        }
-        return i;
+    int i = 0;
+    char tmpbuf[4];
+    int iRet = 0;
+    char *ptr = bin;
+    for (i = 0; i < strlen(bin) / 2; i++)
+    {
+        memset(tmpbuf, 0x00, sizeof(tmpbuf));
+        memcpy(tmpbuf, ptr, 2);
+        ptr += 2;
+        iRet = strtol(tmpbuf, NULL, 16);
+#ifndef NO_DEBUG
+//printf("the iRet =[%d]\n", iRet);
+#endif
+
+        memset(outs++, iRet, 1);
+    }
+    return i;
 }
 
 void read_whole_file(char fileName[1000], char buffer[3072])
 {
-    FILE * file = fopen(fileName, "r");
-    if(file == NULL)
+    FILE *file = fopen(fileName, "r");
+    if (file == NULL)
     {
         puts("File not found");
         exit(1);
     }
-    char  c;
-    int idx=0;
-    while (fscanf(file , "%c" ,&c) == 1)
+    char c;
+    int idx = 0;
+    while (fscanf(file, "%c", &c) == 1)
     {
         buffer[idx] = c;
         idx++;
@@ -129,12 +144,15 @@ EC_KEY *CalculateKey(const EC_GROUP *ec_group, const char *privkey_hex_string)
     EC_POINT *pubkey = NULL;
     BIGNUM *privkey = NULL;
 
-    if (!BN_hex2bn(&privkey, (const char *)privkey_hex_string)) return NULL;
-    if ((pubkey = EC_POINT_new(ec_group)) == NULL) goto err;
+    if (!BN_hex2bn(&privkey, (const char *)privkey_hex_string))
+        return NULL;
+    if ((pubkey = EC_POINT_new(ec_group)) == NULL)
+        goto err;
     if (!ec_key)
     {
         ec_key = EC_KEY_new();
-        if (!ec_key) goto err;
+        if (!ec_key)
+            goto err;
         if (!EC_KEY_set_group(ec_key, ec_group))
         {
             EC_KEY_free(ec_key);
@@ -158,19 +176,20 @@ EC_KEY *CalculateKey(const EC_GROUP *ec_group, const char *privkey_hex_string)
     }
 
 err:
-    if (privkey) BN_free(privkey);
-    if (pubkey) EC_POINT_free(pubkey);
+    if (privkey)
+        BN_free(privkey);
+    if (pubkey)
+        EC_POINT_free(pubkey);
 
     return ec_key;
 }
 
-EC_KEY *CalcSm2PublicKey(const char *pubkey_hex_string, char* private_hex_x)
+EC_KEY *CalcSm2PublicKey(const char *pubkey_hex_string, char *private_hex_x)
 {
 
-                int bn_len = 0;
-    char raw_buf[128] ={0};
+    int bn_len = 0;
+    char raw_buf[128] = {0};
     BIGNUM *k = NULL;
-
 
     EC_KEY *ec_key = NULL;
     EC_POINT *pubkey = NULL;
@@ -181,7 +200,7 @@ EC_KEY *CalcSm2PublicKey(const char *pubkey_hex_string, char* private_hex_x)
         goto err;
     printf("ec_group\n");
 
-     EC_POINT *ecp =NULL;
+    EC_POINT *ecp = NULL;
 
     pubkey = EC_POINT_hex2point(ec_group, (const char *)pubkey_hex_string, ecp, NULL);
     if (!pubkey)
@@ -189,7 +208,8 @@ EC_KEY *CalcSm2PublicKey(const char *pubkey_hex_string, char* private_hex_x)
     printf("EC_POINT_hex2point\n");
 
     ec_key = EC_KEY_new();
-    if (!ec_key) goto err;
+    if (!ec_key)
+        goto err;
     printf("EC_KEY_new\n");
 
     if (!EC_KEY_set_group(ec_key, ec_group))
@@ -198,7 +218,7 @@ EC_KEY *CalcSm2PublicKey(const char *pubkey_hex_string, char* private_hex_x)
         ec_key = NULL;
         goto err;
     }
-     printf("EC_KEY_set_group\n");
+    printf("EC_KEY_set_group\n");
 
     if (!EC_KEY_set_public_key(ec_key, pubkey))
     {
@@ -206,19 +226,19 @@ EC_KEY *CalcSm2PublicKey(const char *pubkey_hex_string, char* private_hex_x)
         ec_key = NULL;
         goto err;
     }
-     printf("EC_KEY_set_public_key\n");
-   
-    if(private_hex_x != NULL){
+    printf("EC_KEY_set_public_key\n");
+
+    if (private_hex_x != NULL)
+    {
         bn_len = b2s((char *)private_hex_x, raw_buf);
         printf("bn_len = [%d]\n", bn_len);
 
         k = BN_new();
-        if(BN_bin2bn((const unsigned char*)raw_buf, bn_len, k) == NULL){
-                        printf("bin2bn fail!\n");
-                        exit(0);
-
+        if (BN_bin2bn((const unsigned char *)raw_buf, bn_len, k) == NULL)
+        {
+            printf("bin2bn fail!\n");
+            exit(0);
         }
-
 
         if (!EC_KEY_set_private_key(ec_key, k))
         {
@@ -226,65 +246,85 @@ EC_KEY *CalcSm2PublicKey(const char *pubkey_hex_string, char* private_hex_x)
             ec_key = NULL;
             goto err;
         }
-
     }
 
-
-
 err:
-    if (pubkey) EC_POINT_free(pubkey);
-    if (ec_group) EC_GROUP_free(ec_group);
+    if (pubkey)
+        EC_POINT_free(pubkey);
+    if (ec_group)
+        EC_GROUP_free(ec_group);
 
     return ec_key;
 }
 
-EVP_PKEY *ReadEvpKeyFromPem(char fileName[1000]){
+EVP_PKEY *ReadEvpKeyFromPem(char fileName[1000])
+{
     EVP_PKEY *pkey = NULL;
-    BIO              *certbio = NULL;
-  BIO               *outbio = NULL;
-  X509                *cert = NULL;
-  int ret;
+    BIO *certbio = NULL;
+    BIO *outbio = NULL;
+    X509 *cert = NULL;
+    int ret;
 
-     OpenSSL_add_all_algorithms();
-  ERR_load_BIO_strings();
-  ERR_load_crypto_strings();
+    OpenSSL_add_all_algorithms();
+    ERR_load_BIO_strings();
+    ERR_load_crypto_strings();
 
-  /* ---------------------------------------------------------- *
+    /* ---------------------------------------------------------- *
    * Create the Input/Output BIO's.                             *
    * ---------------------------------------------------------- */
-  certbio = BIO_new(BIO_s_file());
-  outbio  = BIO_new_fp(stdout, BIO_NOCLOSE);
+    certbio = BIO_new(BIO_s_file());
+    outbio = BIO_new_fp(stdout, BIO_NOCLOSE);
 
-  /* ---------------------------------------------------------- *
+    /* ---------------------------------------------------------- *
    * Load the certificate from file (PEM).                      *
    * ---------------------------------------------------------- */
-  ret = BIO_read_filename(certbio, fileName);
-  if (! (cert = PEM_read_bio_X509(certbio, NULL, 0, NULL))) {
-    BIO_printf(outbio, "Error loading cert into memory\n");
-    exit(-1);
-  }
+    ret = BIO_read_filename(certbio, fileName);
+    if (!(cert = PEM_read_bio_X509(certbio, NULL, 0, NULL)))
+    {
+        BIO_printf(outbio, "Error loading cert into memory\n");
+        exit(-1);
+    }
 
-  /* ---------------------------------------------------------- *
+    /* ---------------------------------------------------------- *
    * Extract the certificate's public key data.                 *
    * ---------------------------------------------------------- */
-  if ((pkey = X509_get_pubkey(cert)) == NULL)
-    BIO_printf(outbio, "Error getting public key from certificate");
+
+    if ((pkey = X509_get_pubkey(cert)) == NULL)
+        BIO_printf(outbio, "Error getting public key from certificate");
 
     return pkey;
 }
 
+EVP_PKEY *ReadPrivKeyFromFile(char fileName[1000])
+{
+    FILE *f;
+    EVP_PKEY *pkey = EVP_PKEY_new();
+    f = fopen(fileName, "rb");
+    PEM_read_PrivateKey(
+        f,     /* use the FILE* that was opened */
+        &pkey, /* pointer to EVP_PKEY structure */
+        NULL,  /* password callback - can be NULL */
+        NULL   /* parameter passed to callback or password if callback is NULL */
+    );
+    if (f)
+        fclose(f);
+    return pkey;
+}
 EC_KEY *CalculatePubKey(const EC_GROUP *ec_group, const char *pub_hex_string)
 {
     EC_KEY *ec_key = NULL;
     EC_POINT *pubkey = NULL;
 
-    if ((pubkey = EC_POINT_new(ec_group)) == NULL) goto err;
-    if (!EC_POINT_hex2point(ec_group, pub_hex_string, pubkey, NULL)) goto err;
-    
+    if ((pubkey = EC_POINT_new(ec_group)) == NULL)
+        goto err;
+    if (!EC_POINT_hex2point(ec_group, pub_hex_string, pubkey, NULL))
+        goto err;
+
     if (!ec_key)
     {
         ec_key = EC_KEY_new();
-        if (!ec_key) goto err;
+        if (!ec_key)
+            goto err;
         if (!EC_KEY_set_group(ec_key, ec_group))
         {
             EC_KEY_free(ec_key);
@@ -301,7 +341,8 @@ EC_KEY *CalculatePubKey(const EC_GROUP *ec_group, const char *pub_hex_string)
     }
 
 err:
-    if (pubkey) EC_POINT_free(pubkey);
+    if (pubkey)
+        EC_POINT_free(pubkey);
 
     return ec_key;
 }
@@ -316,20 +357,19 @@ int main(int argc, char *argv[])
     char ciphertext_buf[1024] = {0};
     size_t ciphertext_len = 0;
 
-
     if (argc < 4)
     {
         printf("Usage: \n\t%s e|E sm2pubkey text\n", argv[0]);
         printf("\t%s d|D sm2privatekey hex_ciphertext\n", argv[0]);
         return 0;
     }
-    
+
     sm2group = EC_GROUP_new_by_curve_name(NID_sm2);
     if (!sm2group)
     {
         goto err;
     }
-    
+
     if (!strcasecmp(argv[1], "E"))
     {
         /*Encrypt*/
@@ -339,7 +379,8 @@ int main(int argc, char *argv[])
         // char cert_buf[] = "0488401CB3995DEBAEC11B891992C7E83675359D4A2C910EFF25DA17928B263B1E8D919A63AE4EED467E57DE41EAB96ED5085850BCEF0B480C5929CB3F1F1DDFE4";
         // sm2key = CalcSm2PublicKey(cert_buf, NULL);
         EVP_PKEY *eKey = ReadEvpKeyFromPem(argv[2]);
-        if(eKey){
+        if (eKey)
+        {
             sm2key = EVP_PKEY_get1_EC_KEY(eKey);
         }
         if (!sm2key)
@@ -347,63 +388,75 @@ int main(int argc, char *argv[])
             printf("Error Of Calculate SM2 Public Key.\n");
             goto err;
         }
-     
-	    //sm2enc = sm2_encrypt((const unsigned char *)argv[3], (size_t)strlen(argv[3]), NULL/*EVP_sm3()*/, sm2key);
-	    retval = sm2_encrypt(sm2key, EVP_sm3(), argv[3], strlen(argv[3]), ciphertext_buf, (size_t *)&ciphertext_len);
-	    if (!retval)
+
+        //sm2enc = sm2_encrypt((const unsigned char *)argv[3], (size_t)strlen(argv[3]), NULL/*EVP_sm3()*/, sm2key);
+        retval = sm2_encrypt(sm2key, EVP_sm3(), argv[3], strlen(argv[3]), ciphertext_buf, (size_t *)&ciphertext_len);
+        if (!retval)
         {
             printf("Error Of calculate cipher text length.\n");
             goto err;
         }
-	    
-	    
-	  DEBUG_CHAR_HEX(ciphertext_buf, ciphertext_len);
-	  exit(0);
-	  
+
+        DEBUG_CHAR_HEX(ciphertext_buf, ciphertext_len);
+        exit(0);
     }
     else if (!strcasecmp(argv[1], "D"))
     {
         unsigned char *in = NULL;
         size_t inlen = strlen(argv[3]) / 2;
-        
+
         /*Decrypt*/
-         char cert_buf[3072] = {0};
-        read_whole_file(argv[2],cert_buf);
-        sm2key = CalculateKey((const EC_GROUP *)sm2group, cert_buf);
+        //  char cert_buf[3072] = {0};
+        // char cert_buf[3072] = "9952dc22a776a69689d3b28730ddb1d11a7e324579dfc469694f5dcdcd4254cb";
+        // read_whole_file(argv[2],cert_buf);
+        // sm2key = CalculateKey((const EC_GROUP *)sm2group, cert_buf);
+        // EVP_PKEY *eKey = ReadEvpKeyFromPem(argv[2]);
+        EVP_PKEY *eKey = ReadPrivKeyFromFile(argv[2]);
+        if (eKey)
+        {
+            sm2key = EVP_PKEY_get1_EC_KEY(eKey);
+        }
+
         if (!sm2key)
         {
             printf("Error Of Calculate SM2 Private Key.\n");
             goto err;
         }
-        
+
         in = OPENSSL_malloc(inlen);
         if (!in)
         {
             printf("Error Of Alloc Memory.\n");
             goto err;
         }
-        
+
+        uint8_t encArr[] = {0x30, 0x71, 0x02, 0x21, 0x00, 0xC8, 0x6D, 0x61, 0x10, 0xB4, 0x4E, 0xEE, 0xD4, 0xBA, 0xE7, 0xAE, 0x94, 0xC7, 0x08, 0xB8, 0x59, 0x49, 0x6D, 0x27, 0x63, 0x5A, 0x81, 0xAD, 0xCB, 0xE5, 0x78, 0x0A, 0x23, 0x7E, 0xAB, 0x5C, 0x00, 0x02, 0x20, 0x1D, 0xC3, 0xB3, 0x25, 0x15, 0x55, 0xBC, 0x21, 0x0C, 0x3F, 0x5C, 0xA3, 0x51, 0xA3, 0x0B, 0x57, 0xEB, 0xA0, 0xFE, 0x0A, 0x95, 0x30, 0xE6, 0xA7, 0xC2, 0xA9, 0x2D, 0x5D, 0x48, 0xF1, 0xD2, 0x47, 0x04, 0x20, 0xB5, 0x19, 0xDB, 0xEC, 0xA0, 0x42, 0xA0, 0x9E, 0x21, 0x97, 0x27, 0x6A, 0xE0, 0x47, 0x7D, 0xDA, 0xDE, 0x00, 0x5E, 0xC8, 0x3A, 0x7F, 0x65, 0xEA, 0xE7, 0xB1, 0x4F, 0x01, 0x3A, 0x44, 0x97, 0x62, 0x04, 0x08, 0xE4, 0xF4, 0xB8, 0x10, 0x5C, 0x9C, 0x03, 0x58};
+        size_t size = sizeof encArr / sizeof encArr[0];
         ciphertext_len = b2s(argv[3], in);
-	unsigned char ptext_buf[1024] = {0};
+        
+        unsigned char ptext_buf[1024] = {0};
         size_t ptext_len = 0;
 
-          retval = sm2_decrypt(sm2key, EVP_sm3(), in, ciphertext_len, ptext_buf, &ptext_len);
-                if (!retval)
-          {
-              printf("Error Of sm2_decrypt.\n");
-              goto err;
-          }
-          DEBUG_CHAR_HEX(ptext_buf, ptext_len);
-
+        //retval = sm2_decrypt(sm2key, EVP_sm3(), in, ciphertext_len, ptext_buf, &ptext_len);
+        retval = sm2_decrypt(sm2key, EVP_sm3(), encArr, size, ptext_buf, &ptext_len);
+        if (!retval)
+        {
+            printf("Error Of sm2_decrypt.\n");
+            goto err;
+        }
+        DEBUG_CHAR(ptext_buf, ptext_len);
     }
     else
     {
         printf("Error Of Option.\n");
     }
 err:
-    if (sm2group) EC_GROUP_free(sm2group);
-    if (sm2key) EC_KEY_free(sm2key);
-    if (out) OPENSSL_free(out);
-    
-	return 0;
+    if (sm2group)
+        EC_GROUP_free(sm2group);
+    if (sm2key)
+        EC_KEY_free(sm2key);
+    if (out)
+        OPENSSL_free(out);
+
+    return 0;
 }
