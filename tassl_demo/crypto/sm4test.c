@@ -86,12 +86,12 @@ int main(int argc, char **argv)
     int loop;
     
     signal(SIGALRM, time_out);
-    SM4_set_key((const unsigned char *)user_key, 16, &key);
+    SM4_set_key((const unsigned char *)user_key, &key);
     
     /*输出轮密钥*/
     for (loop = 0; loop < 32; loop++)
     {
-        printf("\trk[%02d]=0x%08X", loop, key.key[loop]);
+        printf("\trk[%02d]=0x%08X", loop, key.rk[loop]);
         if (!((loop + 1) % 4)) printf("\n");
     }
     
@@ -140,7 +140,7 @@ int main(int argc, char **argv)
     for (run = 1; run; loop++)
         SM4_encrypt((const unsigned char *)out, out, &key);
     
-    printf("Now SM4_encrypt times: [%ld]\n", loop);
+    printf("Now SM4_encrypt times: [%d]\n", loop);
 
     return 0;
 }

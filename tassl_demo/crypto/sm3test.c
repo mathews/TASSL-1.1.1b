@@ -61,7 +61,7 @@
 #include <string.h>
 #include <unistd.h>
 #include <signal.h>
-#include "crypto/include/internal/sm3.h"
+#include "openssl/sm3.h"
 #include "openssl/evp.h"
 
 int run;
@@ -142,7 +142,7 @@ int main(int argc, char **argv)
         for (run = 1; run; i++)
                 SM3((unsigned char *)"12324524alsdkf", 12, digest);
 
-        printf("SM3 digest times in 20 seconds: [%ld]\n", i);
+        printf("SM3 digest times in 20 seconds: [%d]\n", i);
 
         return 0;
 
