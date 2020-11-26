@@ -64,6 +64,142 @@
 #include "crypto/include/internal/evp_int.h"
 #include "crypto/evp/evp_locl.h"
 
+/*Compute SM2 sign extra data: Z = HASH256(ENTL + ID + a + b + Gx + Gy + Xa + Ya)*/
+int ECDSA_sm2_get_Z(const EC_KEY *ec_key, const EVP_MD *md, const char *uid, int uid_len, unsigned char *z_buf, size_t *z_len)
+{
+    EVP_MD_CTX *ctx;
+    const EC_GROUP *group = NULL;
+    BIGNUM *a = NULL, *b = NULL;
+    const EC_POINT *point = NULL;
+    unsigned char *z_source = NULL;
+    int retval = 0;
+    int deep, z_s_len;
+
+    EC_POINT *pub_key = NULL;
+    const BIGNUM *priv_key = NULL;
+
+    if (md == NULL)
+        md = EVP_sm3();
+    if (*z_len < EVP_MD_size(EVP_sm3()))
+    {
+        printf("1\n");
+        return 0;
+    }
+
+    group = EC_KEY_get0_group(ec_key);
+    if (group == NULL)
+    {
+        printf("2\n");
+        goto err;
+    }
+
+    a = BN_new(), b = BN_new();
+    if ((a == NULL) || (b == NULL))
+    {
+        printf("3\n");
+        goto err;
+    }
+
+    //get the a, b params for the EC_group
+    if (!EC_GROUP_get_curve_GFp(group, NULL, a, b, NULL))
+    {
+        printf("4\n");
+        goto err;
+    }
+
+    if ((point = EC_GROUP_get0_generator(group)) == NULL)
+    {
+        printf("5\n");
+        goto err;
+    }
+
+    deep = (EC_GROUP_get_degree(group) + 7) / 8;
+    if ((uid == NULL) || (uid_len <= 0))
+    {
+        uid = (const char *)"1234567812345678";
+        uid_len = 16;
+    }
+
+    /*alloc z_source buffer*/
+    while (!(z_source = (unsigned char *)OPENSSL_malloc(1 + 4 * deep)))
+        ;
+
+    /*ready to digest*/
+    ctx = EVP_MD_CTX_create();
+    EVP_DigestInit(ctx, md);
+
+    z_s_len = 0;
+    /*first: set the two bytes of uid bits + uid*/
+    uid_len = uid_len * 8;
+
+    z_source[z_s_len++] = (unsigned char)((uid_len >> 8) & 0xFF);
+    z_source[z_s_len++] = (unsigned char)(uid_len & 0xFF);
+    uid_len /= 8;
+    EVP_DigestUpdate(ctx, z_source, z_s_len);
+    EVP_DigestUpdate(ctx, uid, uid_len);
+
+    /*second: add a and b*/
+    BN_bn2bin(a, z_source + deep - BN_num_bytes(a));
+    EVP_DigestUpdate(ctx, z_source, deep);
+    BN_bn2bin(b, z_source + deep - BN_num_bytes(a));
+    EVP_DigestUpdate(ctx, z_source, deep);
+
+    /*third: add Gx and Gy*/
+    z_s_len = EC_POINT_point2oct(group, point, POINT_CONVERSION_UNCOMPRESSED, z_source, (1 + 4 * deep), NULL);
+    /*must exclude PC*/
+    EVP_DigestUpdate(ctx, z_source + 1, z_s_len - 1);
+
+    /*forth: add public key*/
+    point = EC_KEY_get0_public_key(ec_key);
+    if (!point)
+    {
+        //if fail to get the EC_POINT from public key, the following code calculate publickey from private key
+        priv_key = EC_KEY_get0_private_key(ec_key);
+        if (!priv_key)
+        {
+            printf("6\n");
+            goto err;
+        }
+
+        pub_key = EC_POINT_new(group);
+        if (!pub_key)
+        {
+            printf("7\n");
+            goto err;
+        }
+
+        if (!EC_POINT_mul(group, pub_key, priv_key, NULL, NULL, NULL))
+        {
+            printf("8\n");
+            goto err;
+        }
+
+        point = (const EC_POINT *)pub_key;
+    }
+
+    z_s_len = EC_POINT_point2oct(group, /*EC_KEY_get0_public_key(ec_key)*/ point, POINT_CONVERSION_UNCOMPRESSED, z_source, (1 + 4 * deep), NULL);
+    /*must exclude PC*/
+    EVP_DigestUpdate(ctx, z_source + 1, z_s_len - 1);
+
+    /*fifth: output digest*/
+    EVP_DigestFinal(ctx, z_buf, (unsigned *)z_len);
+    EVP_MD_CTX_destroy(ctx);
+
+    retval = (int)(*z_len);
+
+err:
+    if (z_source)
+        OPENSSL_free(z_source);
+    if (pub_key)
+        EC_POINT_free(pub_key);
+    if (a)
+        BN_free(a);
+    if (b)
+        BN_free(b);
+
+    return retval;
+}
+
 int main(int argc, char *argv[])
 {
     EVP_PKEY *sm2key = NULL;
@@ -152,6 +288,7 @@ int main(int argc, char *argv[])
     EVP_SignInit(md_ctx, EVP_sm3());
     EVP_SignUpdate(md_ctx, digest, len);
     EVP_SignUpdate(md_ctx, argv[1], (size_t)strlen(argv[1]));
+    //ilen will be set by EVP_SignFinal
     if (!EVP_SignFinal(md_ctx, NULL, (unsigned int *)&ilen, sm2key))
     {
         printf("Calculate Signature Length error!\n");

@@ -26,6 +26,10 @@ int main(int argc, char **argv)
         exit(0);
     }
     EVP_CIPHER_CTX_init(ctx);
+   
+    //sm4_cbc is the mostly-used encryption method
+    // EVP_CipherInit(ctx, EVP_sm4_cbc(), key, iv, 1);
+    // equal to the following method
     EVP_CipherInit_ex(ctx, EVP_sm4_cbc(), NULL, key, iv, 1);
 
     if(!EVP_CipherUpdate(ctx, outbuf, &outlen, inbuf, strlen(inbuf)))
